@@ -1,8 +1,7 @@
 import pandas as pd
 import os
-from strategy.utils import quarters_dict, next_quarter, price_data, get_data
 from strategy.clustering import train_kmeans, get_cluster_mapping, construct_params
-
+from .utils import price_data
 
 def load_df_dict(path='data/quarterly/', feature_start_idx=3):
     df_dict = {}
@@ -15,8 +14,6 @@ def load_df_dict(path='data/quarterly/', feature_start_idx=3):
             df_dict[quarter] = df
     return df_dict
 
-
-# === Cluster-Aware Dataset Builder ===
 def build_dataset(stock_list, df_dict, price_data, n_clusters=15):
     """
     Constructs cluster-relative training dataset using construct_params().

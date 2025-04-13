@@ -1,16 +1,13 @@
 import pandas as pd
-import numpy as np
 from sklearn.ensemble import RandomForestClassifier
-
 from .clustering import train_kmeans, get_cluster_mapping, construct_params
-from .dataset import load_df_dict
 
 
 def train_random_forest(X_train, y_train, threshold, seed):
     """Train and return a Random Forest classifier using top-quantile labeling."""
+    threshold = y_train.quantile(0.75)
+    y_binary = (y_train > threshold).astype(int)
 
-    cutoff = y_train.quantile(1 - threshold)
-    y_binary = (y_train > cutoff).astype(int)
     model = RandomForestClassifier(
         max_depth=10,
         n_estimators=100,
@@ -40,27 +37,29 @@ def get_top_k_predictions(clf, X_test, y_test, symbols, k=10):
 
 
 def build_training_data(df_dict, price_data, n_clusters=15, seed=42):
-    """
-    Construct a DataFrame of training samples based on clustering behavior and relative positioning.
-    """
     models = train_kmeans(df_dict, n_clusters=n_clusters, seed=seed)
     stock_list = sorted({symbol for df in df_dict.values() for symbol in df['symbol'].unique()})
-    data = []
+    data_dict = {}
 
     for quarter in sorted(df_dict.keys())[:-2]:
         model = models.get(quarter)
         if model is None:
             continue
 
-        cluster_map = get_cluster_mapping(df_dict, model, quarter, stock_list )
+        cluster_map = get_cluster_mapping(df_dict, model, quarter, stock_list)
 
         for cluster in cluster_map.values():
             df = construct_params(price_data, cluster, quarter, df_dict)
             if df is not None and not df.empty:
-                df['quarter'] = quarter
-                data.append(df)
+                if quarter not in data_dict:
+                    data_dict[quarter] = []
+                data_dict[quarter].append(df)
 
-    if not data:
+    for quarter in data_dict:
+        data_dict[quarter] = pd.concat(data_dict[quarter], ignore_index=True)
+
+    if not data_dict:
         raise ValueError("No data generated. Check cluster mapping or construct_params.")
 
-    return pd.concat(data, ignore_index=True)
+    return data_dict
+

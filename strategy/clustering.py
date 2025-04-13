@@ -1,9 +1,8 @@
 import pandas as pd
 import numpy as np
 from sklearn.cluster import KMeans
-from datetime import datetime, timedelta
-from strategy.dataset import price_data
-from strategy.utils import quarters_dict, next_quarter, returns, get_data, price_data
+from datetime import timedelta
+from strategy.utils import quarters_dict, next_quarter, returns, get_data
 
 
 def train_kmeans(df_dict, n_clusters=15, seed=42, feature_start_idx=3):

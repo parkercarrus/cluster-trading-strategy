@@ -1,5 +1,5 @@
-from .models import train_model, get_top_k_predictions, build_training_data
-from .utils import next_quarter, perma_strat, quarters_dict, price_data
+from .utils import perma_strat, quarters_dict
+from .models import build_training_data, train_model, get_top_k_predictions
 import pandas as pd
 import numpy as np
 import random
@@ -62,39 +62,68 @@ def compute_baseline_returns(price_data: pd.DataFrame, quarters_dict: dict) -> p
     return df
 
 
-def step_forward_backtest(df_dict, price_data, k=10):
-    from .models import build_training_data, train_model, get_top_k_predictions
+def step_forward_backtest(df_dict, price_data, quarters_dict, k=10):
 
     data_dict = build_training_data(df_dict, price_data)
+    quarters = list(quarters_dict.keys())
     predictions = {}
-    quarters = sorted(data_dict['quarter'].unique())
 
     for i in range(len(quarters) - 2):
         q_train = quarters[i]
-        q_test = quarters[i + 1]
+        q_feat = quarters[i + 1]
+        q_eval = quarters[i]
 
-        # Filter and clean training data
-        train_df = data_dict[data_dict['quarter'] == q_train].dropna(subset=['target']).dropna()
-        if train_df.empty:
+        try:
+            train_df = data_dict[q_train].dropna(subset=['target'])
+            test_df = data_dict[q_feat].dropna(subset=['target'])
+
+        except KeyError as e:
+            print(f"Missing data for quarter: {e}")
             continue
-        X_train = train_df.drop(columns=['symbol', 'target', 'quarter'])
+
+        if train_df.empty or test_df.empty:
+            continue
+
+        # Split train
+        train_df = train_df.dropna()
+        test_df = test_df.dropna()
+        X_train = train_df.drop(columns=['symbol', 'target'])
         y_train = train_df['target']
 
-        # Filter and clean testing data
-        test_df = data_dict[data_dict['quarter'] == q_test].dropna(subset=['target']).dropna()
-        if test_df.empty:
-            continue
-        X_test = test_df.drop(columns=['symbol', 'target', 'quarter'])
+        # Split test
+        X_test = test_df.drop(columns=['symbol', 'target'])
         y_test = test_df['target']
-        symbols = test_df['symbol']
+        symbols = test_df['symbol'].reset_index(drop=True)
+
+        train_df = train_df.dropna()
+        test_df = test_df.dropna()
 
         # Train and predict
         model = train_model(X_train, y_train)
         top_k_df = get_top_k_predictions(model, X_test, y_test, symbols, k=k)
-        top_k_df['quarter'] = q_test
-        predictions[q_test] = top_k_df
+
+        # Add quarter label
+        top_k_df = top_k_df.copy()
+        top_k_df['quarter'] = q_feat
+
+        # Add returns Q_feat → Q_eval
+        start_date = quarters_dict[q_feat]
+        end_date = quarters_dict[q_eval]
+        returns = []
+        for symbol in top_k_df['symbol']:
+            try:
+                start_price = price_data.loc[start_date:, symbol].dropna().iloc[0]
+                end_price = price_data.loc[end_date:, symbol].dropna().iloc[0]
+                ret = (end_price - start_price) / start_price
+                returns.append(ret)
+            except:
+                returns.append(np.nan)
+
+        top_k_df['return'] = returns
+        predictions[q_feat] = top_k_df.dropna(subset=['return'])
 
     return predictions
+
 
 
 
@@ -111,7 +140,7 @@ def backtest(
     random.seed(random_state)
 
     if use_step_forward:
-        quarterly_predictions = step_forward_backtest(df_dict, price_data, k=k)
+        quarterly_predictions = step_forward_backtest(df_dict, price_data, quarters_dict, k=k)
     else:
         raise NotImplementedError('Only step-forward backtest is supported.')
 
