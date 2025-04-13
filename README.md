@@ -62,5 +62,5 @@ Total Trades:       100
 
 ---
 
-**Author**: Algory Capital
+**Author**: Algory Capital \
 **License**: MIT
