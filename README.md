@@ -1,6 +1,6 @@
-# Cluster-Aware Stock Ranking Strategy
+# Clustering-Informed Algorithmic Trading
 
-This project implements a **cluster-aware, step-forward backtested machine learning strategy** for ranking and selecting top-performing stocks based on future relative performance. Stocks are grouped into clusters using KMeans, and features are engineered to reflect both relative positioning and cluster dynamics.
+This project implements a **cluster-aware, step-forward backtested machine learning strategy** for ranking and selecting top-performing stocks based on predicted future relative performance. Stocks are grouped into clusters using KMeans, and features are engineered to reflect both relative positioning and cluster dynamics.
 
 ## Highlights
 
@@ -28,11 +28,12 @@ main/
 
 ## How to Run
 
-1. Place per-quarter processed CSVs in `data/processed/quarterly/`
+1. Ensure per-quarter processed CSVs in `data/processed/quarterly/`
 2. Ensure `data/price_data.csv` is present and formatted with prices
 3. From the `main/` directory, run:
 
 ```bash
+pip install requirements.txt
 python run.py
 ```
 
