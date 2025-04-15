@@ -71,27 +71,71 @@ def calculate_relative_performance(price_data, cluster, train_quarter, days=1):
 
     return pd.DataFrame(results)
 
+def calculate_outright_performance(price_data, cluster, train_quarter, quarters_ahead=1, days=7):
+    start_date = pd.to_datetime(quarters_dict[train_quarter])
 
-def construct_params(price_data, cluster, quarter, df_dict):
+    current_q = train_quarter
+    for _ in range(quarters_ahead):
+        next_q = next_quarter(current_q)
+        if next_q not in quarters_dict:
+            break
+        current_q = next_q
+
+    end_date = pd.to_datetime(quarters_dict[current_q]) + timedelta(days=90)
+
+    valid_stocks = [stock for stock in cluster if stock in price_data.columns]
+    if not valid_stocks:
+        return None
+
+    price_window = price_data[valid_stocks].loc[start_date:end_date]
+
+    rets_df = returns(price_window, days=days)
+
+    return rets_df.rename(columns={'returns': 'outright_performance'})
+
+def construct_params(price_data, cluster, quarter, df_dict, relative_performance=True):
     q1 = next_quarter(quarter)
     q2 = next_quarter(q1)
 
-    # Distance to centroid in two consecutive quarters
-    d0 = centroid_distance(construct_data(cluster, quarter, df_dict))
+    # gather base features
+    cluster_data_base = construct_data(cluster, quarter, df_dict)
+    base_features = cluster_data_base.copy()
+
+    # centroid distances
+    d0 = centroid_distance(cluster_data_base)
     d1 = centroid_distance(construct_data(cluster, q1, df_dict))
 
-    symbols = d0[['symbol']].copy()
-    feature_cols = d0.columns.drop('symbol')
+    d0 = d0[d0['symbol'] != 'centroid'].reset_index(drop=True)
+    d1 = d1[d1['symbol'] != 'centroid'].reset_index(drop=True)
 
+    # calculate delta
+    feature_cols = d0.columns.drop('symbol')
     delta = d1[feature_cols] - d0[feature_cols]
     delta.columns = [f"{col}_delta" for col in feature_cols]
+    delta.insert(0, 'symbol', d0['symbol'].values)
 
-    rel_perf_q1 = calculate_relative_performance(price_data, cluster, q1)
-    rel_perf_q2 = calculate_relative_performance(price_data, cluster, q2)
-    rel_perf_q2.columns = ['symbol', 'target']
+    if relative_performance:
+        rel_perf_q1 = calculate_outright_performance(price_data, cluster, q1)
+        rel_perf_q2 = calculate_outright_performance(price_data, cluster, q2)
+        rel_perf_q2.columns = ['symbol', 'target']
 
-    df = pd.concat([symbols, d0[feature_cols], delta], axis=1)
-    df = df.merge(rel_perf_q1, on='symbol')
-    df = df.merge(rel_perf_q2, on='symbol')
+        # --- Final merge ---
+        df = base_features.merge(d0, on='symbol') \
+                        .merge(delta, on='symbol') \
+                        .merge(rel_perf_q1, on='symbol') \
+                        .merge(rel_perf_q2, on='symbol')
+        
+    else:
+        out_perf_q1 = calculate_outright_performance(price_data, cluster, q1)
+        out_perf_q2 = calculate_outright_performance(price_data, cluster, q2)
+        out_perf_q2.columns = ['symbol', 'target']
+
+        # --- Final merge ---
+        df = base_features.merge(d0, on='symbol') \
+                        .merge(delta, on='symbol') \
+                        .merge(out_perf_q1, on='symbol') \
+                        .merge(out_perf_q2, on='symbol')
+         
+
 
     return df

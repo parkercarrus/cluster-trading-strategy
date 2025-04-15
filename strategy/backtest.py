@@ -62,9 +62,9 @@ def compute_baseline_returns(price_data: pd.DataFrame, quarters_dict: dict) -> p
     return df
 
 
-def step_forward_backtest(df_dict, price_data, quarters_dict, k=10):
+def step_forward_backtest(df_dict, price_data, quarters_dict, fundamentals_only, k=10, relative_performance=True):
 
-    data_dict = build_training_data(df_dict, price_data)
+    data_dict = build_training_data(df_dict, price_data, relative_performance=relative_performance)
     quarters = list(quarters_dict.keys())
     predictions = {}
 
@@ -87,6 +87,11 @@ def step_forward_backtest(df_dict, price_data, quarters_dict, k=10):
         # Split train
         train_df = train_df.dropna()
         test_df = test_df.dropna()
+
+        if fundamentals_only:
+            train_df = train_df[['currentRatio', 'quickRatio', 'returnOnEquity', 'returnOnAssets', 'netProfitMargin', 'priceEarningsRatio', 'priceBookValueRatio', 'priceToSalesRatio', 'freeCashFlowPerShare', 'operatingCashFlowPerShare', 'cashFlowToDebtRatio', 'debtEquityRatio', 'longTermDebtToCapitalization', 'assetTurnover', 'inventoryTurnover', 'symbol', 'target']]
+            test_df = test_df[['currentRatio', 'quickRatio', 'returnOnEquity', 'returnOnAssets', 'netProfitMargin', 'priceEarningsRatio', 'priceBookValueRatio', 'priceToSalesRatio', 'freeCashFlowPerShare', 'operatingCashFlowPerShare', 'cashFlowToDebtRatio', 'debtEquityRatio', 'longTermDebtToCapitalization', 'assetTurnover', 'inventoryTurnover', 'symbol', 'target']]
+
         X_train = train_df.drop(columns=['symbol', 'target'])
         y_train = train_df['target']
 
@@ -94,9 +99,6 @@ def step_forward_backtest(df_dict, price_data, quarters_dict, k=10):
         X_test = test_df.drop(columns=['symbol', 'target'])
         y_test = test_df['target']
         symbols = test_df['symbol'].reset_index(drop=True)
-
-        train_df = train_df.dropna()
-        test_df = test_df.dropna()
 
         # Train and predict
         model = train_model(X_train, y_train)
@@ -125,8 +127,6 @@ def step_forward_backtest(df_dict, price_data, quarters_dict, k=10):
     return predictions
 
 
-
-
 def backtest(
     df_dict,
     price_data,
@@ -135,12 +135,14 @@ def backtest(
     k=10,
     log=True,
     write_csv=False,
+    fundamentals_only=False,
+    relative_performance=True
 ):
     np.random.seed(random_state)
     random.seed(random_state)
 
     if use_step_forward:
-        quarterly_predictions = step_forward_backtest(df_dict, price_data, quarters_dict, k=k)
+        quarterly_predictions = step_forward_backtest(df_dict, price_data, quarters_dict, k=k, fundamentals_only=fundamentals_only, relative_performance=relative_performance)
     else:
         raise NotImplementedError('Only step-forward backtest is supported.')
 

@@ -12,5 +12,9 @@ if __name__ == "__main__":
         use_step_forward=True,
         k=10,
         log=True,
-        write_csv=True
+        write_csv=False,
+        fundamentals_only=False,
+        relative_performance=False
     )
+
+    print(results.sort_values(by='return', ascending=False))

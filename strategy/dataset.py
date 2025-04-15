@@ -14,7 +14,7 @@ def load_df_dict(path='data/quarterly/', feature_start_idx=3):
             df_dict[quarter] = df
     return df_dict
 
-def build_dataset(stock_list, df_dict, price_data, n_clusters=15):
+def build_dataset(stock_list, df_dict, price_data, n_clusters=15, relative_performance=True):
     """
     Constructs cluster-relative training dataset using construct_params().
     """
@@ -29,7 +29,7 @@ def build_dataset(stock_list, df_dict, price_data, n_clusters=15):
         cluster_map = get_cluster_mapping(model, quarter, stock_list)
 
         for cluster in cluster_map.values():
-            df = construct_params(price_data, cluster, quarter, df_dict)
+            df = construct_params(price_data, cluster, quarter, df_dict, relative_performance)
             if df is not None and not df.empty:
                 df['quarter'] = quarter
                 all_data.append(df)

@@ -1,7 +1,17 @@
 import pandas as pd
+import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from .clustering import train_kmeans, get_cluster_mapping, construct_params
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score, GridSearchCV
 
+param_grid = {
+    'n_estimators': [100, 300, 500],
+    'max_depth': [None, 10, 20],
+    'min_samples_split': [2, 5],
+    'min_samples_leaf': [1, 2],
+    'max_features': ['sqrt', 'log2'],
+}
 
 def train_random_forest(X_train, y_train, threshold, seed):
     """Train and return a Random Forest classifier using top-quantile labeling."""
@@ -9,14 +19,45 @@ def train_random_forest(X_train, y_train, threshold, seed):
     y_binary = (y_train > threshold).astype(int)
 
     model = RandomForestClassifier(
-        max_depth=10,
-        n_estimators=100,
+        n_estimators=500,         
+        max_depth=None,          
+        min_samples_split=5,     
+        min_samples_leaf=2,      
+        max_features='sqrt',      
+        class_weight='balanced',
+        bootstrap=True,         
+        oob_score=True,           
+        n_jobs=-1,              
         random_state=seed,
-        n_jobs=-1
+        verbose=0
     )
+
     model.fit(X_train, y_binary)
+    cv_auc = cross_val_score(model, X_train, y_binary, scoring='roc_auc', cv=5)
+    print(f"Cross-Validation AUC: {np.mean(cv_auc)}")
     return model
 
+def train_random_forest_gridsearch(X_train, y_train, threshold, seed):
+    """Train and return a Random Forest classifier using top-quantile labeling."""
+    threshold = y_train.quantile(0.75)
+    y_binary = (y_train > threshold).astype(int)
+
+    rf = RandomForestClassifier(random_state=42, class_weight='balanced', n_jobs=-1)
+
+    grid_search = GridSearchCV(
+        estimator=rf,
+        param_grid=param_grid,
+        scoring='roc_auc',
+        cv=5,
+        verbose=1,
+        n_jobs=-1,
+    )
+    grid_search.fit(X_train, y_binary)
+    print("Best AUC:", grid_search.best_score_)
+    print("Best params:", grid_search.best_params_)
+
+    best_model = grid_search.best_estimator_
+    return best_model
 
 def train_model(X_train, y_train, model='RandomForest', threshold=0.25, seed=17):
     """Train a model based on a string identifier."""
@@ -24,7 +65,6 @@ def train_model(X_train, y_train, model='RandomForest', threshold=0.25, seed=17)
         return train_random_forest(X_train, y_train, threshold, seed)
     else:
         raise NotImplementedError(f"Model '{model}' not supported.")
-
 
 def get_top_k_predictions(clf, X_test, y_test, symbols, k=10):
     """Return top-k predicted symbols with associated scores and targets."""
@@ -35,8 +75,8 @@ def get_top_k_predictions(clf, X_test, y_test, symbols, k=10):
     })
     return df.sort_values(by='prob', ascending=False).head(k)
 
+def build_training_data(df_dict, price_data, n_clusters=15, seed=42, relative_performance=True):
 
-def build_training_data(df_dict, price_data, n_clusters=15, seed=42):
     models = train_kmeans(df_dict, n_clusters=n_clusters, seed=seed)
     stock_list = sorted({symbol for df in df_dict.values() for symbol in df['symbol'].unique()})
     data_dict = {}
@@ -49,7 +89,7 @@ def build_training_data(df_dict, price_data, n_clusters=15, seed=42):
         cluster_map = get_cluster_mapping(df_dict, model, quarter, stock_list)
 
         for cluster in cluster_map.values():
-            df = construct_params(price_data, cluster, quarter, df_dict)
+            df = construct_params(price_data, cluster, quarter, df_dict, relative_performance)
             if df is not None and not df.empty:
                 if quarter not in data_dict:
                     data_dict[quarter] = []
@@ -62,4 +102,3 @@ def build_training_data(df_dict, price_data, n_clusters=15, seed=42):
         raise ValueError("No data generated. Check cluster mapping or construct_params.")
 
     return data_dict
-
