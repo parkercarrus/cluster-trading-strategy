@@ -47,7 +47,6 @@ def centroid_distance(cluster_data):
     all_data[cols] = delta
     return all_data
 
-
 def calculate_relative_performance(price_data, cluster, train_quarter, days=1):
     start_date = pd.to_datetime(quarters_dict[train_quarter])
     end_date = start_date + timedelta(days=90)

@@ -1,44 +1,59 @@
-from .utils import perma_strat, quarters_dict
-from .models import build_training_data, train_model, get_top_k_predictions
+from .utils import quarters_dict
+from .models import build_training_data, train_model, rank_stocks, get_buys, get_sells
 import pandas as pd
 import numpy as np
 import random
 
-
-def long(top_df, quarter, price_data, perma=True):
-    start_date, end_date = (
-        perma_strat(quarter, quarters_dict)
-    )
-
+def compute_quarterly_returns(buys_df, sells_df, price_data, quarters_dict):
     results = []
-    for symbol in top_df['symbol']:
-        if symbol not in price_data.columns:
-            continue
-        try:
-            start_price = price_data.loc[start_date:, symbol].dropna().iloc[0]
-            end_price = price_data.loc[end_date:, symbol].dropna().iloc[0]
-            ret = (end_price - start_price) / start_price
-            results.append({
-                'symbol': symbol,
-                'start_price': start_price,
-                'end_price': end_price,
-                'return': ret,
-                'purchase_date': start_date
-            })
-        except:
-            continue
+
+    # Create lookup for sells: (symbol, buy_date) -> (sell_date, sell_price)
+    sell_lookup = {
+        (row['symbol'], row['sell_date']): row for _, row in sells_df.iterrows()
+    }
+
+    for _, row in buys_df.iterrows():
+        symbol = row['symbol']
+        buy_date = row['buy_date']
+        buy_price = row['buy_price']
+        quarter = None
+
+        # Find matching quarter
+        for q, start in quarters_dict.items():
+            if start == buy_date:
+                quarter = q
+                break
+
+        # Determine sell price
+        sell_row = next(
+            (r for r in sells_df.itertuples() if r.symbol == symbol and r.sell_date > buy_date),
+            None
+        )
+
+        if sell_row:
+            sell_price = sell_row.sell_price
+            sell_date = sell_row.sell_date
+        else:
+            # Perma hold — use last available price
+            try:
+                sell_price = price_data.loc[buy_date:, symbol].dropna().iloc[-1]
+                sell_date = price_data.loc[buy_date:, symbol].dropna().index[-1]
+            except:
+                continue  # skip if no future price data
+
+        gain = (sell_price - buy_price) / buy_price
+
+        results.append({
+            'symbol': symbol,
+            'buy_date': buy_date,
+            'buy_price': buy_price,
+            'sell_date': sell_date,
+            'sell_price': sell_price,
+            'gain': gain,
+            'quarter': quarter
+        })
 
     return pd.DataFrame(results)
-
-
-def compute_quarterly_returns(quarterly_predictions, price_data):
-    results = []
-    for quarter, top_df in quarterly_predictions.items():
-        ret_df = long(top_df, quarter, price_data, perma=True)
-        ret_df['quarter'] = quarter
-        results.append(ret_df)
-    return pd.concat(results, ignore_index=True)
-
 
 def compute_baseline_returns(price_data: pd.DataFrame, quarters_dict: dict) -> pd.DataFrame:
     capital = [100000]
@@ -61,98 +76,126 @@ def compute_baseline_returns(price_data: pd.DataFrame, quarters_dict: dict) -> p
     df['baseline_capital'] = capital[1:]
     return df
 
+def get_train_test_data(data_dict, q_train, q_feat, fundamentals_only):
+    """Extract and prepare training and testing data for a given pair of quarters."""
+    try:
+        train_df = data_dict[q_train].dropna(subset=['target'])
+        test_df = data_dict[q_feat].dropna(subset=['target'])
+    except KeyError as e:
+        print(f"Missing data for quarter: {e}")
+        return None, None, None, None, None
 
-def step_forward_backtest(df_dict, price_data, quarters_dict, fundamentals_only, k=10, relative_performance=True):
+    if train_df.empty or test_df.empty:
+        return None, None, None, None, None
 
+    train_df = train_df.dropna()
+    test_df = test_df.dropna()
+
+    if fundamentals_only:
+        columns = ['currentRatio', 'quickRatio', 'returnOnEquity', 'returnOnAssets', 'netProfitMargin',
+                   'priceEarningsRatio', 'priceBookValueRatio', 'priceToSalesRatio', 'freeCashFlowPerShare',
+                   'operatingCashFlowPerShare', 'cashFlowToDebtRatio', 'debtEquityRatio',
+                   'longTermDebtToCapitalization', 'assetTurnover', 'inventoryTurnover', 'symbol', 'target']
+        train_df = train_df[columns]
+        test_df = test_df[columns]
+
+    X_train = train_df.drop(columns=['symbol', 'target'])
+    y_train = train_df['target']
+    X_test = test_df.drop(columns=['symbol', 'target'])
+    y_test = test_df['target']
+    symbols = test_df['symbol'].reset_index(drop=True)
+
+    return X_train, y_train, X_test, y_test, symbols
+
+def backtest_loop(df_dict, price_data, quarters_dict, fundamentals_only, k=10, relative_performance=True):
     data_dict = build_training_data(df_dict, price_data, relative_performance=relative_performance)
     quarters = list(quarters_dict.keys())
-    predictions = {}
+    
+    active_positions = []
+    buy_records = []
+    sell_records = []
 
     for i in range(len(quarters) - 2):
-        q_train = quarters[i]
-        q_feat = quarters[i + 1]
-        q_eval = quarters[i]
-
-        try:
-            train_df = data_dict[q_train].dropna(subset=['target'])
-            test_df = data_dict[q_feat].dropna(subset=['target'])
-
-        except KeyError as e:
-            print(f"Missing data for quarter: {e}")
-            continue
-
-        if train_df.empty or test_df.empty:
-            continue
-
-        # Split train
-        train_df = train_df.dropna()
-        test_df = test_df.dropna()
-
-        if fundamentals_only:
-            train_df = train_df[['currentRatio', 'quickRatio', 'returnOnEquity', 'returnOnAssets', 'netProfitMargin', 'priceEarningsRatio', 'priceBookValueRatio', 'priceToSalesRatio', 'freeCashFlowPerShare', 'operatingCashFlowPerShare', 'cashFlowToDebtRatio', 'debtEquityRatio', 'longTermDebtToCapitalization', 'assetTurnover', 'inventoryTurnover', 'symbol', 'target']]
-            test_df = test_df[['currentRatio', 'quickRatio', 'returnOnEquity', 'returnOnAssets', 'netProfitMargin', 'priceEarningsRatio', 'priceBookValueRatio', 'priceToSalesRatio', 'freeCashFlowPerShare', 'operatingCashFlowPerShare', 'cashFlowToDebtRatio', 'debtEquityRatio', 'longTermDebtToCapitalization', 'assetTurnover', 'inventoryTurnover', 'symbol', 'target']]
-
-        X_train = train_df.drop(columns=['symbol', 'target'])
-        y_train = train_df['target']
-
-        # Split test
-        X_test = test_df.drop(columns=['symbol', 'target'])
-        y_test = test_df['target']
-        symbols = test_df['symbol'].reset_index(drop=True)
-
-        # Train and predict
-        model = train_model(X_train, y_train)
-        top_k_df = get_top_k_predictions(model, X_test, y_test, symbols, k=k)
-
-        # Add quarter label
-        top_k_df = top_k_df.copy()
-        top_k_df['quarter'] = q_feat
-
-        # Add returns Q_feat → Q_eval
+        q_train, q_feat, q_eval = quarters[i], quarters[i+1], quarters[i+2]
         start_date = quarters_dict[q_feat]
         end_date = quarters_dict[q_eval]
-        returns = []
-        for symbol in top_k_df['symbol']:
+
+        X_train, y_train, X_test, y_test, symbols = get_train_test_data(data_dict, q_train, q_feat, fundamentals_only)
+        if X_train is None:
+            continue
+
+        model = train_model(X_train, y_train)
+        rankings_df = rank_stocks(model, X_test, y_test, symbols) # rank all stocks based on predicted future returns
+
+        buys = get_buys(rankings_df, k=k)
+        # Record buys
+        for _, row in buys.iterrows():
+            symbol = row['symbol']
             try:
                 start_price = price_data.loc[start_date:, symbol].dropna().iloc[0]
-                end_price = price_data.loc[end_date:, symbol].dropna().iloc[0]
-                ret = (end_price - start_price) / start_price
-                returns.append(ret)
+                buy_records.append({
+                    'symbol': symbol,
+                    'buy_date': start_date,
+                    'buy_price': start_price
+                })
+                active_positions.append({
+                    'symbol': symbol,
+                    'start_price': start_price,
+                    'start_date': start_date
+                })
             except:
-                returns.append(np.nan)
+                continue
 
-        top_k_df['return'] = returns
-        predictions[q_feat] = top_k_df.dropna(subset=['return'])
+        # Record closes
+        sells = get_sells(rankings_df, active_positions)
+        for closed_position in sells:
+            symbol = closed_position['symbol']
+            try:
+                end_price = price_data.loc[end_date:, symbol].dropna().iloc[0]
+                gain = (end_price - closed_position['start_price']) / closed_position['start_price']
+                sell_records.append({
+                    'symbol': symbol,
+                    'sell_date': end_date,
+                    'sell_price': end_price,
+                    'gain': gain
+                })
+                active_positions.remove(closed_position)
+            except:
+                continue
 
-    return predictions
+    buys_df = pd.DataFrame(buy_records)
+    sells_df = pd.DataFrame(sell_records)
+    print(sells_df)
+    return buys_df, sells_df
 
-
-def backtest(
-    df_dict,
-    price_data,
-    random_state=102,
-    use_step_forward=True,
-    k=10,
-    log=True,
-    write_csv=False,
-    fundamentals_only=False,
-    relative_performance=True
-):
+def main(df_dict, price_data, random_state=102, use_step_forward=True, k=10, log=True, write_csv=False, fundamentals_only=False, relative_performance=True, quarters_dict=quarters_dict):
     np.random.seed(random_state)
     random.seed(random_state)
 
-    if use_step_forward:
-        quarterly_predictions = step_forward_backtest(df_dict, price_data, quarters_dict, k=k, fundamentals_only=fundamentals_only, relative_performance=relative_performance)
-    else:
-        raise NotImplementedError('Only step-forward backtest is supported.')
+    # main backtesting loop
+    buys_df, sells_df = backtest_loop(
+        df_dict,
+        price_data,
+        quarters_dict,
+        fundamentals_only=fundamentals_only,
+        k=k,
+        relative_performance=relative_performance
+    )
 
-    strategy_returns = compute_quarterly_returns(quarterly_predictions, price_data)
+    # compute strategy vs. baseline returns
+    strategy_returns = compute_quarterly_returns(buys_df, sells_df, price_data, quarters_dict)
     baseline_returns = compute_baseline_returns(price_data, quarters_dict)
 
     merged = pd.merge(baseline_returns, strategy_returns, on='quarter')
-    merged['strat_edge'] = merged['return'] - merged['baseline_return']
-    merged = merged[['quarter', 'purchase_date', 'baseline_return', 'symbol',
-                     'start_price', 'end_price', 'return', 'strat_edge']]
+    merged['strat_edge'] = merged['gain'] - merged['baseline_return']
+    merged = merged[['quarter', 'buy_date', 'sell_date', 'baseline_return', 'symbol',
+                     'buy_price', 'sell_price', 'gain', 'strat_edge']]
+    merged = merged.rename(columns={
+        'buy_date': 'purchase_date',
+        'buy_price': 'start_price',
+        'sell_price': 'end_price',
+        'gain': 'return'
+    })
 
     if log:
         avg_return = merged['return'].mean()
