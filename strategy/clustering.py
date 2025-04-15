@@ -71,7 +71,7 @@ def calculate_relative_performance(price_data, cluster, train_quarter, days=1):
 
     return pd.DataFrame(results)
 
-def calculate_outright_performance(price_data, cluster, train_quarter, quarters_ahead=1, days=7):
+def calculate_outright_performance(price_data, cluster, train_quarter, quarters_ahead=2, days=7):
     start_date = pd.to_datetime(quarters_dict[train_quarter])
 
     current_q = train_quarter
