@@ -1,11 +1,10 @@
 from strategy.dataset import load_df_dict, price_data
-from strategy.models import build_training_data, train_model, get_top_k_predictions
-from strategy.backtest import backtest
+from strategy.backtest import main
 
 if __name__ == "__main__":
     df_dict = load_df_dict()
 
-    results = backtest(
+    results = main(
         df_dict=df_dict,
         price_data=price_data,
         random_state=42,
