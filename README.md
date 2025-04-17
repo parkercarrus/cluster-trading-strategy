@@ -1,6 +1,3 @@
-## Update: predicting outright performance + 2Q ahead instead of rel. 1q ahead significantly improves AUC and performance
-## Most recent AUC: 0.84 avg
-
 # Clustering-Informed Algorithmic Trading
 
 This project implements a **cluster-aware, step-forward backtested machine learning strategy** for ranking and selecting top-performing stocks based on predicted future relative performance. Stocks are grouped into clusters using KMeans, and features are engineered to reflect both relative positioning and cluster dynamics.
@@ -37,6 +34,8 @@ main/
 
 ```bash
 pip install requirements.txt
+git lfs install
+git lfs pull
 python run.py
 ```
 
