@@ -62,7 +62,7 @@ def train_random_forest(X_train, y_train, threshold, seed):
 
     model.fit(X_train, y_binary)
     cv_auc = cross_val_score(model, X_train, y_binary, scoring='roc_auc', cv=5)
-    #print(f"Cross-Validation AUC: {np.mean(cv_auc)}")
+    
     return model
 
 def train_random_forest_gridsearch(X_train, y_train, threshold, seed):
