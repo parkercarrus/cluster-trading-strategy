@@ -7,15 +7,11 @@ import random
 def compute_quarterly_returns(buys_df, sells_df, price_data, quarters_dict):
     results = []
 
-    # Create lookup for sells: (symbol, buy_date) -> (sell_date, sell_price)
-    sell_lookup = {
-        (row['symbol'], row['sell_date']): row for _, row in sells_df.iterrows()
-    }
-
     for _, row in buys_df.iterrows():
         symbol = row['symbol']
         buy_date = row['buy_date']
         buy_price = row['buy_price']
+        confidence = row['confidence']
         quarter = None
 
         # Find matching quarter
@@ -50,7 +46,8 @@ def compute_quarterly_returns(buys_df, sells_df, price_data, quarters_dict):
             'sell_date': sell_date,
             'sell_price': sell_price,
             'gain': gain,
-            'quarter': quarter
+            'quarter': quarter,
+            'confidence': confidence
         })
 
     return pd.DataFrame(results)
@@ -126,22 +123,23 @@ def backtest_loop(df_dict, price_data, quarters_dict, fundamentals_only, k=10, r
 
         model = train_model(X_train, y_train)
         rankings_df = rank_stocks(model, X_test, y_test, symbols) # rank all stocks based on predicted future returns
-
         buys = get_buys(rankings_df, k=k)
         # Record buys
         for _, row in buys.iterrows():
             symbol = row['symbol']
+            confidence = row['prob']
             try:
                 start_price = price_data.loc[start_date:, symbol].dropna().iloc[0]
                 buy_records.append({
                     'symbol': symbol,
                     'buy_date': start_date,
-                    'buy_price': start_price
+                    'buy_price': start_price,
+                    'confidence': confidence
                 })
                 active_positions.append({
                     'symbol': symbol,
                     'start_price': start_price,
-                    'start_date': start_date
+                    'start_date': start_date,
                 })
             except:
                 continue
@@ -164,8 +162,8 @@ def backtest_loop(df_dict, price_data, quarters_dict, fundamentals_only, k=10, r
                 continue
 
     buys_df = pd.DataFrame(buy_records)
+    buys_df.to_csv('buys.csv')
     sells_df = pd.DataFrame(sell_records)
-    print(sells_df)
     return buys_df, sells_df
 
 def main(df_dict, price_data, random_state=102, use_step_forward=True, k=10, log=True, write_csv=False, fundamentals_only=False, relative_performance=True, quarters_dict=quarters_dict):
@@ -189,7 +187,7 @@ def main(df_dict, price_data, random_state=102, use_step_forward=True, k=10, log
     merged = pd.merge(baseline_returns, strategy_returns, on='quarter')
     merged['strat_edge'] = merged['gain'] - merged['baseline_return']
     merged = merged[['quarter', 'buy_date', 'sell_date', 'baseline_return', 'symbol',
-                     'buy_price', 'sell_price', 'gain', 'strat_edge']]
+                     'buy_price', 'sell_price', 'gain', 'strat_edge', 'confidence']]
     merged = merged.rename(columns={
         'buy_date': 'purchase_date',
         'buy_price': 'start_price',
@@ -218,3 +216,86 @@ def main(df_dict, price_data, random_state=102, use_step_forward=True, k=10, log
             print(f"Results written to: {path}")
 
     return merged
+
+def simulate_portfolio_ledger(returns_df, price_data, initial_capital=100_000, confidence_weighted=True):
+    returns_df = returns_df.copy()
+    returns_df['purchase_date'] = pd.to_datetime(returns_df['purchase_date'])
+    returns_df['sell_date'] = pd.to_datetime(returns_df['sell_date'])
+
+    start = returns_df['purchase_date'].min()
+    end = returns_df['sell_date'].max()
+    all_dates = pd.date_range(start, end, freq='B')
+
+    cash = initial_capital
+    positions = []
+    portfolio_history = []
+
+    for current_date in all_dates:
+        # Close positions
+        closing_today = [pos for pos in positions if pos['sell_date'] == current_date]
+        for pos in closing_today:
+            try:
+                sell_price = price_data.at[current_date, pos['symbol']]
+                proceeds = sell_price * pos['shares']
+                cash += proceeds
+            except KeyError:
+                continue  # missing price
+
+        # Remove closed positions
+        positions = [pos for pos in positions if pos['sell_date'] > current_date]
+
+        # Open new positions
+        todays_buys = returns_df[returns_df['purchase_date'] == current_date]
+        if not todays_buys.empty:
+            if confidence_weighted:
+                total_conf = todays_buys['confidence'].sum()
+                weights = (
+                    todays_buys['confidence'] / total_conf if total_conf > 0
+                    else np.repeat(1 / len(todays_buys), len(todays_buys))
+                )
+            else:
+                weights = np.repeat(1 / len(todays_buys), len(todays_buys))
+
+            for (_, row), weight in zip(todays_buys.iterrows(), weights):
+                allocation = cash * weight
+                try:
+                    buy_price = price_data.at[current_date, row['symbol']]
+                    shares = allocation / buy_price
+                    positions.append({
+                        'symbol': row['symbol'],
+                        'shares': shares,
+                        'buy_price': buy_price,
+                        'purchase_date': row['purchase_date'],
+                        'sell_date': row['sell_date']
+                    })
+                    cash -= allocation
+                except KeyError:
+                    continue  # missing buy price
+
+        # Compute total portfolio value
+        invested = 0
+        for pos in positions:
+            try:
+                try:
+                    price = price_data.at[current_date, pos['symbol']]
+                except KeyError:
+                    try:
+                        # fallback to last known price before this date
+                        price = price_data.loc[:current_date, pos['symbol']].dropna().iloc[-1]
+                    except:
+                        raise IndexError(f"Index out of range for {pos}")
+
+                invested += price * pos['shares']
+            except KeyError as e:
+                continue
+
+        portfolio_value = cash + invested
+        portfolio_history.append({
+            'date': current_date,
+            'portfolio_value': portfolio_value,
+            'cash': cash,
+            'invested': invested,
+            'num_positions': len(positions)
+        })
+
+    return pd.DataFrame(portfolio_history)

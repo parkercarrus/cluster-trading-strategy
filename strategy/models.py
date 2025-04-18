@@ -112,5 +112,8 @@ def get_sells(ranked_stocks_df, positions, threshold=0.3):
 
     # Filter current active positions for those now deemed poor
     sells = [p for p in positions if p['symbol'] in poor_symbols]
-    print(sells)
     return sells
+
+def get_optimal_weights(buys_df, method):
+    if method == 'prop_confidence':
+        return
