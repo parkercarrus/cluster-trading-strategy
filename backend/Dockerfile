@@ -6,7 +6,6 @@ WORKDIR /app
 
 COPY . .
 
-RUN git lfs pull || true
 RUN pip install -r requirements.txt
 
 EXPOSE 10000
