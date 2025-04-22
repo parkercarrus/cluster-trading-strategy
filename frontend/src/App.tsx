@@ -1,9 +1,9 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import Navbar from './components/Navbar';
-import Backtest from './pages/Backtest'
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import BaselineDashboard from './pages/BaselineDashboard';
+import BacktestPage from './pages/BacktestPage';
 import About from './pages/About';
+import Navbar from './components/Navbar';
 
 const App = () => {
   return (
@@ -11,10 +11,10 @@ const App = () => {
       <div style={{ backgroundColor: '#0A1929', minHeight: '100vh', color: 'white' }}>
         <Navbar />
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/backtest" element={<Backtest />} />
+          <Route path="/" element={<BaselineDashboard />} />
+          <Route path="/backtest" element={<BacktestPage />} />
           <Route path="/about" element={<About />} />
-          <Route path="/GitHub" element={<a href="https://github.com/parkercarrus/cluster-trading-strategy" target="_blank" rel="noopener noreferrer">GitHub</a>} />
+          <Route path="/github" element={<Navigate to="https://github.com/parkercarrus/cluster-trading-strategy" />} />
         </Routes>
       </div>
     </Router>

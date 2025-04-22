@@ -84,44 +84,48 @@ const TradeTable: React.FC<{ data: TradeData[] }> = ({ data }) => {
         }
       }}>
         <Table stickyHeader>
-        <TableHead>
+          <TableHead>
             <TableRow sx={{ backgroundColor: '#161616' }}>
-                {displayedColumns.map(({ id, label, align }) => (
+              {displayedColumns.map(({ id, label, align }) => (
                 <TableCell
-                    key={id}
-                    align={align || 'left'}
-                    sortDirection={orderBy === id ? order : false}
-                    sx={{
+                  key={id}
+                  align={align || 'left'}
+                  sortDirection={orderBy === id ? order : false}
+                  sx={{
                     fontWeight: 600,
                     fontSize: '0.875rem',
                     backgroundColor: '#161616',
                     color: '#FFFFFF',
-                    }}
+                  }}
                 >
-                    <TableSortLabel
+                  <TableSortLabel
                     active={orderBy === id}
                     direction={orderBy === id ? order : 'asc'}
                     onClick={() => handleSort(id)}
                     sx={{
+                      color: '#FFFFFF',
+                      '&.Mui-active': {
                         color: '#FFFFFF',
-                        '&.Mui-active': {
-                        color: '#FFFFFF',
-                        },
-                        '& .MuiTableSortLabel-icon': {
+                      },
+                      '& .MuiTableSortLabel-icon': {
                         color: '#FFFFFF !important',
-                        },
+                      },
                     }}
-                    >
+                  >
                     {label}
-                    </TableSortLabel>
+                  </TableSortLabel>
                 </TableCell>
-                ))}
+              ))}
             </TableRow>
-            </TableHead>
+          </TableHead>
 
           <TableBody>
             {sorted.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((row) => (
-              <TableRow key={`${row.symbol}-${row.purchase_date}`} hover sx={{ '&:hover': { backgroundColor: '#2A2A2A' } }}>
+              <TableRow
+                key={`${row.symbol}-${row.purchase_date}`}
+                hover
+                sx={{ '&:hover': { backgroundColor: '#2A2A2A' } }}
+              >
                 {displayedColumns.map(({ id, align }) => {
                   const value = row[id];
 
@@ -155,17 +159,22 @@ const TradeTable: React.FC<{ data: TradeData[] }> = ({ data }) => {
                     <TableCell
                       key={id}
                       align={align || (typeof value === 'number' ? 'right' : 'left')}
-                      sx={isReturnField ? { color: returnColor(value as number) } : {}}
                     >
-                      {typeof value === 'number'
-                        ? isCurrency
-                          ? formatCurrency(value)
-                          : isReturnField
-                            ? formatPercent(value)
-                            : value
-                        : id === 'symbol'
-                          ? <Typography fontWeight="bold">{value}</Typography>
-                          : value}
+                      {typeof value === 'number' ? (
+                        isCurrency ? (
+                          formatCurrency(value)
+                        ) : isReturnField ? (
+                          <Typography sx={{ color: returnColor(value), fontWeight: 500 }}>
+                            {`${value >= 0 ? '+' : ''}${formatPercent(value)}`}
+                          </Typography>
+                        ) : (
+                          value
+                        )
+                      ) : id === 'symbol' ? (
+                        <Typography fontWeight="bold">{value}</Typography>
+                      ) : (
+                        value
+                      )}
                     </TableCell>
                   );
                 })}
@@ -180,7 +189,7 @@ const TradeTable: React.FC<{ data: TradeData[] }> = ({ data }) => {
           page={page}
           rowsPerPage={rowsPerPage}
           onPageChange={(_, newPage) => setPage(newPage)}
-          onRowsPerPageChange={e => {
+          onRowsPerPageChange={(e) => {
             setRowsPerPage(parseInt(e.target.value, 10));
             setPage(0);
           }}

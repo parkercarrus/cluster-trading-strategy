@@ -104,10 +104,10 @@ def get_train_test_data(data_dict, q_train, q_feat, fundamentals_only):
 
     return X_train, y_train, X_test, y_test, symbols
 
-def backtest_loop(df_dict, price_data, quarters_dict, fundamentals_only, k=10, relative_performance=True):
+def backtest_loop(df_dict, price_data, quarters_dict, fundamentals_only, k=10, sell_threshold=0.3, relative_performance=True):
     data_dict = build_training_data(df_dict, price_data, relative_performance=relative_performance)
     quarters = list(quarters_dict.keys())
-    
+
     active_positions = []
     buy_records = []
     sell_records = []
@@ -124,6 +124,7 @@ def backtest_loop(df_dict, price_data, quarters_dict, fundamentals_only, k=10, r
         model = train_model(X_train, y_train)
         rankings_df = rank_stocks(model, X_test, y_test, symbols) # rank all stocks based on predicted future returns
         buys = get_buys(rankings_df, k=k)
+        print(buys)
         # Record buys
         for _, row in buys.iterrows():
             symbol = row['symbol']
@@ -145,7 +146,7 @@ def backtest_loop(df_dict, price_data, quarters_dict, fundamentals_only, k=10, r
                 continue
 
         # Record closes
-        sells = get_sells(rankings_df, active_positions)
+        sells = get_sells(rankings_df, active_positions, threshold=sell_threshold)
         for closed_position in sells:
             symbol = closed_position['symbol']
             try:
@@ -165,7 +166,7 @@ def backtest_loop(df_dict, price_data, quarters_dict, fundamentals_only, k=10, r
     sells_df = pd.DataFrame(sell_records)
     return buys_df, sells_df
 
-def main(df_dict, price_data, random_state=102, use_step_forward=True, k=10, log=True, write_csv=False, fundamentals_only=False, relative_performance=True, quarters_dict=quarters_dict):
+def main(df_dict, price_data, random_state=102, k=10, sell_threshold=0.3, log=True, write_csv=False, fundamentals_only=False, relative_performance=True, quarters_dict=quarters_dict):
     np.random.seed(random_state)
     random.seed(random_state)
 
@@ -176,7 +177,8 @@ def main(df_dict, price_data, random_state=102, use_step_forward=True, k=10, log
         quarters_dict,
         fundamentals_only=fundamentals_only,
         k=k,
-        relative_performance=relative_performance
+        sell_threshold=sell_threshold,
+        relative_performance=relative_performance,
     )
 
     # compute strategy vs. baseline returns

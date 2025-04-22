@@ -1,4 +1,3 @@
-// components/BacktestForm.tsx
 import React, { useState } from 'react';
 
 interface BacktestParameters {
@@ -7,29 +6,26 @@ interface BacktestParameters {
   sell_threshold: number;
   start_quarter: string;
   end_quarter: string;
-  model_strategy: string;
   random_state: number;
 }
 
 interface BacktestParametersFormProps {
   onSubmit: (params: BacktestParameters) => void;
+  isLoading?: boolean;
 }
 
-const BacktestParametersForm: React.FC<BacktestParametersFormProps & { isLoading?: boolean }> = ({ onSubmit, isLoading }) => {
+const BacktestParametersForm: React.FC<BacktestParametersFormProps> = ({ onSubmit, isLoading }) => {
   const [parameters, setParameters] = useState<BacktestParameters>({
-    k: 42,
+    k: 10,
     initial_capital: 100000,
     sell_threshold: 0.3,
     start_quarter: 'Q1_2021',
     end_quarter: 'Q4_2024',
-    model_strategy: 'Random Forest',
     random_state: 42,
   });
 
-  const models = ['Random Forest', 'MLP', 'XGBoost'];
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
     setParameters((prev) => ({
       ...prev,
       [name]: ['k', 'initial_capital', 'sell_threshold', 'random_state'].includes(name)
@@ -58,18 +54,10 @@ const BacktestParametersForm: React.FC<BacktestParametersFormProps & { isLoading
       <form onSubmit={handleSubmit} style={formStyle}>
         <FormField label="Select top-K stocks" name="k" value={parameters.k} handleChange={handleChange} type="number" />
         <FormField label="Initial Capital" name="initial_capital" value={parameters.initial_capital} handleChange={handleChange} type="number" />
-        <FormField label="Sell Threshold" name="sell_threshold" value={parameters.sell_threshold} handleChange={handleChange} type="number" />
+        <FormField label="Sell Threshold (0–1)" name="sell_threshold" value={parameters.sell_threshold} handleChange={handleChange} type="number" min={0} max={1} step={0.01} />
         <FormField label="Start Quarter" name="start_quarter" value={parameters.start_quarter} handleChange={handleChange} />
         <FormField label="End Quarter" name="end_quarter" value={parameters.end_quarter} handleChange={handleChange} />
-
-        <div style={rowStyle}>
-          <label style={labelStyle}>Model Strategy</label>
-          <select name="model_strategy" value={parameters.model_strategy} onChange={handleChange} style={inputStyle}>
-            {models.map((model) => (
-              <option key={model} value={model}>{model}</option>
-            ))}
-          </select>
-        </div>
+        <FormField label="Random State" name="random_state" value={parameters.random_state} handleChange={handleChange} type="number" />
 
         <div style={{ textAlign: 'center', marginTop: '20px' }}>
           <button type="submit" style={submitStyle}>Run Backtest</button>
@@ -79,7 +67,7 @@ const BacktestParametersForm: React.FC<BacktestParametersFormProps & { isLoading
   );
 };
 
-const FormField = ({ label, name, value, handleChange, type = 'text' }: any) => (
+const FormField = ({ label, name, value, handleChange, type = 'text', min, max, step }: any) => (
   <div style={rowStyle}>
     <label style={labelStyle}>{label}</label>
     <input
@@ -89,6 +77,9 @@ const FormField = ({ label, name, value, handleChange, type = 'text' }: any) => 
       onChange={handleChange}
       style={inputStyle}
       required
+      min={min}
+      max={max}
+      step={step}
     />
   </div>
 );
@@ -163,7 +154,7 @@ const spinnerStyle: React.CSSProperties = {
   borderRadius: '50%',
   width: '48px',
   height: '48px',
-  animation: 'spin 1s linear infinite',
+  animation: 'spin 2s linear infinite', 
 };
 
 export default BacktestParametersForm;

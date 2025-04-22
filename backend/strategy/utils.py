@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 price_data = pd.read_csv('data/price_data.csv')
 price_data['Date'] = pd.to_datetime(price_data['Date'])
@@ -62,3 +63,34 @@ quarters_dict = {
     "2024_Q3": "2024-11-15",
     "2024_Q4": "2025-02-15"
 }
+
+def getMetrics(ledger, spy):
+    net_return = (ledger.iloc[-1]['portfolio_value'] - ledger.iloc[0]['portfolio_value']) / ledger.iloc[0]['portfolio_value']
+    print(net_return)
+    # MUST REFINE SPY AND LEDGER AT SOME POINT BY DATE
+    spy_baseline = (spy.iloc[-1]['Close'] - spy.iloc[0]['Close']) / spy.iloc[0]['Close']
+    benchmarked_return = net_return - spy_baseline
+    print(spy_baseline)
+    print(benchmarked_return)
+    # compute CAGR    
+    start_date = ledger['date'].min()
+    end_date = ledger['date'].max()
+    years = (pd.Timestamp(end_date) - pd.Timestamp(start_date)).days / 365.25
+    cagr = (1 + net_return) ** (1 / years) - 1
+
+    # compute Sharpe
+    daily_returns = ledger['portfolio_value'].pct_change().dropna()
+    mean_return = daily_returns.mean()
+    std_dev = daily_returns.std()
+    sharpe_ratio = (mean_return / std_dev) * np.sqrt(252) if std_dev != 0 else np.nan
+
+    dict = {
+        "net_return": net_return*100,
+        "benchmarked_return": benchmarked_return*100,
+        "cagr": cagr*100,
+        "sharpe_ratio": sharpe_ratio
+    }
+
+    return dict
+
+

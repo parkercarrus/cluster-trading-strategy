@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import Chart from '../components/Chart';
-import Table from '../components/Table';
+import React, { useState } from 'react';
+import Chart from '../components/Chart.tsx';
+import Table from '../components/Table.tsx';
+import MetricsDashboard from '../components/Metrics.tsx';
 import algoryLogo from '../assets/algory-capital.jpeg';
 
 interface LedgerEntry {
@@ -23,55 +24,59 @@ interface TradeData {
   confidence: number;
 }
 
-const Dashboard = () => {
-  const [ledgerData, setLedgerData] = useState<LedgerEntry[]>([]);
-  const [transactionsData, setTransactionsData] = useState<TradeData[]>([]);
+interface MetricsData {
+  net_return: number;
+  benchmarked_return: number;
+  cagr: number;
+  sharpe_ratio: number;
+}
+interface DashboardProps {
+  ledgerData: LedgerEntry[];
+  transactionsData: TradeData[];
+  metricsData?: MetricsData;
+}
+
+const DashboardView: React.FC<DashboardProps> = ({ ledgerData, transactionsData, metricsData }) => {
+
   const [showPortfolioValue, setShowPortfolioValue] = useState(true);
   const [showNumPositions, setShowNumPositions] = useState(false);
   const [showCash, setShowCash] = useState(false);
   const [showInvested, setShowInvested] = useState(false);
   const [showSpy, setShowSpy] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const ledgerRes = await fetch('http://127.0.0.1:8000/api/uploadLedger');
-        const ledger = await ledgerRes.json();
-        setLedgerData(ledger);
-
-        const transactionsRes = await fetch('http://127.0.0.1:8000/api/uploadTransactions');
-        const transactions = await transactionsRes.json();
-        setTransactionsData(transactions);
-      } catch (err) {
-        console.error('Error fetching data', err);
-      }
-    };
-    fetchData();
-  }, []);
-
   return (
-    <main style={{ padding: '120px 24px 80px', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ position: 'relative' }}>
-        <div style={boxStyle}>
-          <Chart
-            data={ledgerData}
-            showPortfolioValue={showPortfolioValue}
-            showNumPositions={showNumPositions}
-            showCash={showCash}
-            showInvested={showInvested}
-            showSpy={showSpy}
-          />
+    <main style={{ padding: '120px 24px 80px', maxWidth: '80%', margin: '0 auto' }}>
+      {/* Top Section */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '32px', marginBottom: '40px', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: '360px' }}>
+          {metricsData && <MetricsDashboard data={metricsData} />}
         </div>
 
-        <div style={{ position: 'absolute', top: '24px', right: '-170px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={toggleLabelStyle(showPortfolioValue)} onClick={() => setShowPortfolioValue(p => !p)}>Portfolio Value</div>
-          <div style={toggleLabelStyle(showSpy)} onClick={() => setShowSpy(p => !p)}>SPY Baseline</div>
-          <div style={toggleLabelStyle(showNumPositions)} onClick={() => setShowNumPositions(p => !p)}>Number of Positions</div>
-          <div style={toggleLabelStyle(showCash)} onClick={() => setShowCash(p => !p)}>Cash Amount</div>
-          <div style={toggleLabelStyle(showInvested)} onClick={() => setShowInvested(p => !p)}>Invested Amount</div>
+        <div style={{ flex: 2, display: 'flex', flexDirection: 'row', gap: '24px', minWidth: '500px' }}>
+          <div style={{ flex: 1 }}>
+            <div style={boxStyle}>
+              <Chart
+                data={ledgerData}
+                showPortfolioValue={showPortfolioValue}
+                showNumPositions={showNumPositions}
+                showCash={showCash}
+                showInvested={showInvested}
+                showSpy={showSpy}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '24px', minWidth: '180px' }}>
+            <div style={toggleLabelStyle(showPortfolioValue)} onClick={() => setShowPortfolioValue(p => !p)}>Portfolio Value</div>
+            <div style={toggleLabelStyle(showSpy)} onClick={() => setShowSpy(p => !p)}>SPY Baseline</div>
+            <div style={toggleLabelStyle(showNumPositions)} onClick={() => setShowNumPositions(p => !p)}>Number of Positions</div>
+            <div style={toggleLabelStyle(showCash)} onClick={() => setShowCash(p => !p)}>Cash Amount</div>
+            <div style={toggleLabelStyle(showInvested)} onClick={() => setShowInvested(p => !p)}>Invested Amount</div>
+          </div>
         </div>
       </div>
 
+      {/* Trades Table */}
       <div style={{ marginTop: '40px' }}>
         <div style={boxStyle}>
           <h2 style={boxTitleStyle}>Strategy Trades</h2>
@@ -79,13 +84,10 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Footer */}
       <div style={{ position: 'fixed', bottom: '24px', right: '24px', display: 'flex', gap: '24px', alignItems: 'center', zIndex: 1000 }}>
-        <a href="https://github.com/parkercarrus/cluster-trading-strategy" style={iconStyle}>
-          <GitHubIcon />
-        </a>
-        <a href="https://algorycapital.com" style={iconStyle}>
-          <img src={algoryLogo} alt="Algory Capital" style={{ height: '48px' }} />
-        </a>
+        <a href="https://github.com/parkercarrus/cluster-trading-strategy" style={iconStyle}><GitHubIcon /></a>
+        <a href="https://algorycapital.com" style={iconStyle}><img src={algoryLogo} alt="Algory Capital" style={{ height: '48px' }} /></a>
       </div>
     </main>
   );
@@ -129,4 +131,4 @@ const toggleLabelStyle = (active: boolean): React.CSSProperties => ({
   transition: 'color 0.2s ease',
 });
 
-export default Dashboard;
+export default DashboardView;
