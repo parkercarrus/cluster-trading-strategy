@@ -25,6 +25,10 @@ app.add_middleware(
 def health():
     return {"status": "ok"}
 
+@app.head("/health")
+def health_head():
+    return {}
+
 @app.get("/api/uploadLedger")
 def uploadLedger():
     print('ledger upload requested')
