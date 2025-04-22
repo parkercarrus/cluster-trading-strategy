@@ -1,4 +1,8 @@
 from fastapi import FastAPI
+
+app = FastAPI()
+print("App initialized")
+
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 from strategy.dataset import load_df_dict, price_data
@@ -8,9 +12,6 @@ from strategy.utils import getMetrics
 df_dict = load_df_dict()
 spy_baseline = pd.read_csv('data/seed/spy_data.csv')
 
-print('API is starting')
-
-app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
