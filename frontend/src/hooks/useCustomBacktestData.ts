@@ -9,6 +9,7 @@ export interface BacktestParameters {
   end_quarter: string;
   random_state: number;
 }
+const apiUrl = import.meta.env.VITE_API_URL;
 
 const useCustomBacktestData = () => {
   const [ledgerData, setLedgerData] = useState<LedgerEntry[]>([]);
@@ -30,7 +31,7 @@ const useCustomBacktestData = () => {
         end_quarter: params.end_quarter,
       }).toString();
       
-      const res = await fetch(`http://127.0.0.1:8000/api/backtest?${query}`);
+      const res = await fetch(`${apiUrl}/api/backtest?${query}`);
       const data = await res.json();
 
       setLedgerData(data.ledger);

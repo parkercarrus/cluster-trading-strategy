@@ -87,7 +87,7 @@ const DashboardView: React.FC<DashboardProps> = ({ ledgerData, transactionsData,
       {/* Footer */}
       <div style={{ position: 'fixed', bottom: '24px', right: '24px', display: 'flex', gap: '24px', alignItems: 'center', zIndex: 1000 }}>
         <a href="https://github.com/parkercarrus/cluster-trading-strategy" style={iconStyle}><GitHubIcon /></a>
-        <a href="https://algorycapital.com" style={iconStyle}><img src={algoryLogo} alt="Algory Capital" style={{ height: '48px' }} /></a>
+        <a href="https://algorycapital.com" style={iconStyle}><img src={algoryLogo} alt="Algory Capital" style={{ height: '72px' }} /></a>
       </div>
     </main>
   );

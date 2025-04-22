@@ -26,6 +26,7 @@ interface MetricsData {
   cagr: number;
   sharpe_ratio: number;
 }
+const apiUrl = import.meta.env.VITE_API_URL;
 
 const useBaselineDashboardData = () => {
   const [ledgerData, setLedgerData] = useState<LedgerEntry[]>([]);
@@ -35,15 +36,15 @@ const useBaselineDashboardData = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const ledgerRes = await fetch('http://127.0.0.1:8000/api/uploadLedger');
+        const ledgerRes = await fetch(`${apiUrl}/api/uploadLedger`);
         const ledger = await ledgerRes.json();
         setLedgerData(ledger);
 
-        const transactionsRes = await fetch('http://127.0.0.1:8000/api/uploadTransactions');
+        const transactionsRes = await fetch(`${apiUrl}/api/uploadTransactions`);
         const transactions = await transactionsRes.json();
         setTransactionsData(transactions);
 
-        const metricsRes = await fetch('http://127.0.0.1:8000/api/uploadMetrics');
+        const metricsRes = await fetch(`${apiUrl}/api/uploadMetrics`);
         const metrics = await metricsRes.json();
         setMetricsData(metrics);
       } catch (err) {
