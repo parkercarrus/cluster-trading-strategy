@@ -8,11 +8,13 @@ from strategy.utils import getMetrics
 df_dict = load_df_dict()
 spy_baseline = pd.read_csv('data/seed/spy_data.csv')
 
+print('API is starting')
+
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
